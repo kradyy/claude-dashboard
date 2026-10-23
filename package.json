@@ -8,6 +8,17 @@
     "start": "node server.js",
     "check": "node server.js --check"
   },
-  "engines": { "node": ">=22" },
-  "license": "MIT"
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "bin": {
+    "claude-dashboard": "server.js"
+  },
+  "repository": "github:kradyy/claude-dashboard",
+  "files": [
+    "server.js",
+    "index.html",
+    "README.md"
+  ]
 }

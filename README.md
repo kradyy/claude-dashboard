@@ -4,11 +4,49 @@
 
 One local page that shows every running [Claude Code](https://code.claude.com) session on your machine, what each one is doing, your token usage for the last week, and a message box per session so you can hand out the next instruction without hunting for the right terminal tab.
 
-No dependencies. Node 22+. macOS / Linux.
+No dependencies. Node 22+. macOS, Linux and Windows for the dashboard itself; sending messages needs the Unix socket, so macOS or Linux (WSL 2 works).
+
+## Install
+
+Pick one.
+
+**Run it straight from GitHub, nothing to clone:**
 
 ```sh
-npm start        # → http://localhost:7777
-node server.js --check   # self-check of the parser and frame builder
+npx github:kradyy/claude-dashboard
+```
+
+**Clone it:**
+
+```sh
+git clone https://github.com/kradyy/claude-dashboard.git
+cd claude-dashboard
+npm start
+```
+
+**Download a release tarball:**
+
+```sh
+curl -fsSL https://github.com/kradyy/claude-dashboard/archive/refs/tags/v0.1.0.tar.gz | tar xz
+cd claude-dashboard-0.1.0
+npm start
+```
+
+Then open http://localhost:7777. Set `PORT=8000` to use another port. `node server.js --check` runs the built-in self-check.
+
+**Keep it running on macOS** (optional): a launchd agent starts it at login. Run this inside the project folder.
+
+```sh
+cat > ~/Library/LaunchAgents/claude-dashboard.plist <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>claude-dashboard</string>
+  <key>ProgramArguments</key><array><string>$(which node)</string><string>$PWD/server.js</string></array>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+</dict></plist>
+PLIST
+launchctl load ~/Library/LaunchAgents/claude-dashboard.plist
 ```
 
 ## What it shows
