@@ -1,0 +1,13 @@
+{
+  "name": "claude-dashboard",
+  "version": "0.1.0",
+  "description": "Local dashboard for all running Claude Code sessions: status, usage, and a message box per session.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node server.js --check"
+  },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}

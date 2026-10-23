@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1117'/%3E%3Cpath d='M9 11l6 5-6 5' stroke='%23f59e0b' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Crect x='17' y='20' width='7' height='3' rx='1.5' fill='%23e5e7eb'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#0b0d12; --panel:#12151d; --panel2:#181c26; --line:#232936; --text:#e6e8ee; --dim:#8b93a7; --accent:#f59e0b; --busy:#f59e0b; --idle:#3fb950; --wait:#f85149; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+
+  /* top bar: 40px, everything small */
+  header { height:40px; display:flex; align-items:center; gap:10px; padding:0 14px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:2; font-size:12px; }
+  header h1 { margin:0; font-size:13px; font-weight:600; white-space:nowrap; }
+  header input { width:220px; height:26px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:0 8px; font:inherit; font-size:12px; }
+  header input:focus { outline:none; border-color:var(--accent); }
+  .chips { display:flex; gap:4px; }
+  .chip { height:24px; padding:0 9px; border-radius:12px; border:1px solid var(--line); background:transparent; color:var(--dim); font:inherit; font-size:11px; cursor:pointer; display:flex; align-items:center; gap:5px; }
+  .chip b { color:var(--text); font-weight:600; }
+  .chip.on { border-color:var(--accent); color:var(--text); background:#2a2210; }
+  .chip .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:var(--dim); }
+  .chip.busy .dot { background:var(--busy); } .chip.waiting .dot { background:var(--wait); } .chip.idle .dot { background:var(--idle); }
+  .stats { margin-left:auto; display:flex; gap:14px; color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .stats b { color:var(--text); font-weight:600; }
+  .btn { height:24px; padding:0 9px; border-radius:6px; border:1px solid var(--line); background:transparent; color:var(--dim); font:inherit; font-size:11px; cursor:pointer; }
+  .btn:hover { color:var(--text); }
+  @media (max-width:900px) { header { height:auto; min-height:40px; flex-wrap:wrap; padding:6px 12px; } .stats { margin-left:0; width:100%; } header input { flex:1; } }
+
+  main { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; padding:16px; max-width:1600px; margin:0 auto; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; padding:12px; } }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:12px; align-content:start; }
+  @media (max-width:600px) { .cards { grid-template-columns:1fr; } }
+
+  /* card = terminal window */
+  .card { background:#0a0c10; border:1px solid var(--line); border-radius:9px; display:flex; flex-direction:column; overflow:hidden; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; }
+  .card.busy { border-color:#3b2f12; } .card.waiting, .card.blocked { border-color:#4a1d1d; } .card.idle { border-color:#1d3a24; }
+  .head { display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--panel); border-bottom:1px solid var(--line); cursor:pointer; user-select:none; }
+  .head:hover { background:var(--panel2); }
+  .lights { display:flex; gap:5px; flex:none; } .lights i { width:10px; height:10px; border-radius:50%; background:#2a3040; display:block; }
+  .busy .lights i:first-child { background:var(--busy); animation:pulse 1.4s infinite; } .idle .lights i:first-child { background:var(--idle); } .waiting .lights i:first-child, .blocked .lights i:first-child { background:var(--wait); }
+  @keyframes pulse { 50% { opacity:.35; } }
+  .name { font-weight:600; font-size:13px; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:ui-sans-serif,system-ui,sans-serif; }
+  .pill { font-size:10px; text-transform:uppercase; letter-spacing:.5px; padding:1px 6px; border-radius:4px; background:var(--bg); color:var(--dim); flex:none; }
+  .busy .pill { color:var(--busy); } .idle .pill { color:var(--idle); } .waiting .pill, .blocked .pill { color:var(--wait); }
+  .meta { color:var(--dim); font-size:11px; margin-left:auto; white-space:nowrap; }
+  .tog { color:var(--dim); width:14px; text-align:center; flex:none; }
+  .path { padding:8px 12px 0; font-size:11.5px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:left; }
+  .path span { direction:ltr; unicode-bidi:bidi-override; } .path b { color:var(--accent); font-weight:400; }
+  .card.min .path { padding-bottom:8px; }
+  .body { display:flex; flex-direction:column; gap:6px; padding:8px 12px 10px; }
+  .card.min .body { display:none; }
+  .line { white-space:pre-wrap; word-break:break-word; max-height:7em; overflow:hidden; line-height:1.5; }
+  .line.you { color:var(--text); } .line.you::before { content:"❯ "; color:var(--accent); font-weight:700; }
+  .line.claude { color:var(--dim); padding-left:14px; border-left:2px solid #1d3a24; margin-left:3px; }
+  .line.when { color:#5b6478; font-size:10.5px; }
+  form { display:flex; align-items:flex-start; gap:6px; margin-top:4px; border-top:1px dashed var(--line); padding-top:8px; }
+  form::before { content:"❯"; color:var(--accent); font-weight:700; line-height:20px; }
+  textarea { flex:1; resize:none; min-height:20px; max-height:160px; background:transparent; color:var(--text); border:0; padding:0; font:inherit; line-height:20px; caret-color:var(--accent); }
+  textarea:focus { outline:none; }
+  textarea::placeholder { color:#3f475a; }
+  form button { background:transparent; color:var(--dim); border:1px solid var(--line); border-radius:5px; padding:0 8px; height:20px; font:inherit; font-size:10.5px; cursor:pointer; }
+  form button:hover { color:var(--text); border-color:var(--accent); } form button:disabled { opacity:.5; }
+  .note { font-size:11px; min-height:14px; } .note.ok { color:var(--idle); } .note.err { color:var(--wait); }
+
+  aside { display:flex; flex-direction:column; gap:12px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .panel h2 { margin:0 0 8px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); }
+  .bars { display:flex; gap:5px; align-items:flex-end; height:90px; }
+  .bar { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; height:100%; justify-content:flex-end; font-size:9.5px; color:var(--dim); }
+  .bar i { display:block; width:100%; background:var(--accent); opacity:.7; border-radius:3px 3px 0 0; min-height:2px; }
+  .bar.today i { opacity:1; }
+  table { width:100%; border-collapse:collapse; font-size:11.5px; font-variant-numeric:tabular-nums; }
+  td { padding:4px 0; border-top:1px solid var(--line); } td.n { text-align:right; color:var(--dim); } td:last-child { text-align:right; }
+  .empty { color:var(--dim); padding:40px; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude Dashboard</h1>
+  <input id="q" type="search" placeholder="Filter by name, folder, text…" autocomplete="off">
+  <div class="chips" id="chips"></div>
+  <button class="btn" id="toggleAll">Collapse all</button>
+  <div class="stats"><span id="scan"></span><span>today <b id="sTok">–</b> tokens · <b id="sCost">–</b></span></div>
+</header>
+<main>
+  <section class="cards" id="cards"><div class="empty">loading sessions…</div></section>
+  <aside>
+    <div class="panel"><h2>Last 7 days (est. USD)</h2><div class="bars" id="bars"></div></div>
+    <div class="panel"><h2>Today by model</h2><table id="models"></table></div>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmtTok = (n) => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'k' : String(n);
+const fmtUsd = (n) => '$' + n.toFixed(n >= 100 ? 0 : 2);
+const ago = (ts) => { if (!ts) return ''; const s = (Date.now() - new Date(ts)) / 1000; return s < 60 ? `${s|0}s` : s < 3600 ? `${s/60|0}m` : s < 86400 ? `${s/3600|0}h` : `${s/86400|0}d`; };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const order = { waiting: 0, blocked: 0, busy: 1, working: 1, idle: 2 };
+const today = () => new Date().toLocaleDateString('sv-SE');
+const store = (k, v) => { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+
+let sessionsNow = [];
+const drafts = {};
+let filter = { q: '', status: load('cd.status', 'all') };
+const minimized = new Set(load('cd.min', []));
+let collapsedAll = false;
+
+function matches(s) {
+  if (filter.status !== 'all' && s.status !== filter.status) return false;
+  const q = filter.q.trim().toLowerCase();
+  if (!q) return true;
+  return [s.name, s.cwdShort, s.cwd, s.lastPrompt, s.lastReply, s.model].some((v) => (v || '').toLowerCase().includes(q));
+}
+
+function renderChips(live) {
+  const counts = { all: live.length };
+  for (const s of live) counts[s.status] = (counts[s.status] || 0) + 1;
+  $('chips').innerHTML = ['all', 'busy', 'waiting', 'idle'].map((st) =>
+    `<button class="chip ${st} ${filter.status === st ? 'on' : ''}" data-status="${st}">${st === 'all' ? '' : '<span class="dot"></span>'}${st} <b>${counts[st] || 0}</b></button>`).join('');
+}
+
+function card(s) {
+  const min = minimized.has(s.sessionId);
+  const p = s.cwdShort || s.cwd || '';
+  const i = p.lastIndexOf('/');
+  return `
+    <article class="card ${esc(s.status)} ${min ? 'min' : ''}" data-sid="${esc(s.sessionId)}">
+      <div class="head" data-sid="${esc(s.sessionId)}">
+        <span class="lights"><i></i><i></i><i></i></span>
+        <span class="name" title="pid ${s.pid} · ${esc(s.sessionId)}">${esc(s.name || s.sessionId)}</span>
+        <span class="pill">${esc(s.status)}</span>
+        <span class="meta">${esc(s.model ? s.model.replace('claude-','') : s.kind)} · up ${ago(s.startedAt)}</span>
+        <span class="tog">${min ? '+' : '−'}</span>
+      </div>
+      <div class="path" title="${esc(s.cwd)}"><span>${esc(p.slice(0, i + 1))}<b>${esc(p.slice(i + 1))}</b></span></div>
+      <div class="body">
+        ${s.lastActivity ? `<div class="line when">last activity ${ago(s.lastActivity)} ago</div>` : ''}
+        ${s.lastPrompt ? `<div class="line you">${esc(s.lastPrompt)}</div>` : ''}
+        ${s.lastReply ? `<div class="line claude">${esc(s.lastReply)}</div>` : ''}
+        <form data-pid="${s.pid}"><textarea data-pid="${s.pid}" rows="1" placeholder="type and press Enter">${esc(drafts[s.pid] || '')}</textarea><button title="Enter sends, Shift+Enter for a newline">↵ send</button></form>
+        <div class="note" id="note-${s.pid}"></div>
+      </div>
+    </article>`;
+}
+
+function renderSessions() {
+  const live = sessionsNow.filter((s) => s.pid).sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9) || (b.startedAt || 0) - (a.startedAt || 0));
+  renderChips(live);
+  const shown = live.filter(matches);
+  const focused = document.activeElement?.dataset?.pid;
+  $('cards').innerHTML = shown.length ? shown.map(card).join('') : `<div class="empty">${live.length ? 'No sessions match the filter.' : 'No running Claude sessions.'}</div>`;
+  if (focused) { const t = document.querySelector(`textarea[data-pid="${focused}"]`); if (t) { t.focus(); t.selectionStart = t.value.length; } }
+}
+
+function renderUsage(u) {
+  const days = u.days || {}; const t = today();
+  const dayTotals = {}; for (const [d, models] of Object.entries(days)) dayTotals[d] = Object.values(models).reduce((a, m) => ({ cost: a.cost + m.cost, tok: a.tok + m.input + m.output + m.cacheRead + m.cacheWrite }), { cost: 0, tok: 0 });
+  const td = dayTotals[t] || { cost: 0, tok: 0 };
+  $('sTok').textContent = fmtTok(td.tok); $('sCost').textContent = fmtUsd(td.cost);
+  const last7 = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return d.toLocaleDateString('sv-SE'); });
+  const max = Math.max(1, ...last7.map((d) => dayTotals[d]?.cost || 0));
+  $('bars').innerHTML = last7.map((d) => { const c = dayTotals[d]?.cost || 0; return `<div class="bar ${d === t ? 'today' : ''}" title="${d}: ${fmtUsd(c)} · ${fmtTok(dayTotals[d]?.tok || 0)} tokens"><span>${fmtUsd(c)}</span><i style="height:${(c / max * 70)|0}%"></i><span>${d.slice(5)}</span></div>`; }).join('');
+  const rows = Object.entries(days[t] || {}).sort((a, b) => b[1].cost - a[1].cost);
+  $('models').innerHTML = rows.length ? rows.map(([m, v]) => `<tr><td class="mono">${esc(m.replace('claude-',''))}</td><td class="n">${v.calls}</td><td class="n">${fmtTok(v.input + v.output + v.cacheRead + v.cacheWrite)}</td><td>${fmtUsd(v.cost)}</td></tr>`).join('') : '<tr><td class="empty">nothing yet</td></tr>';
+  $('scan').textContent = u.scannedAt ? `scanned ${ago(u.scannedAt)} ago` : 'scanning…';
+}
+
+async function refresh() {
+  try { const r = await fetch('/api/state'); const d = await r.json(); sessionsNow = d.sessions; renderSessions(); renderUsage(d.usage); }
+  catch (e) { $('scan').textContent = 'server unreachable'; }
+}
+
+$('q').addEventListener('input', (e) => { filter.q = e.target.value; renderSessions(); });
+$('chips').addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (!c) return; filter.status = c.dataset.status; store('cd.status', filter.status); renderSessions(); });
+$('toggleAll').addEventListener('click', () => {
+  collapsedAll = !collapsedAll;
+  minimized.clear();
+  if (collapsedAll) sessionsNow.forEach((s) => minimized.add(s.sessionId));
+  store('cd.min', [...minimized]); $('toggleAll').textContent = collapsedAll ? 'Expand all' : 'Collapse all'; renderSessions();
+});
+document.addEventListener('click', (e) => {
+  const h = e.target.closest('.head'); if (!h) return;
+  const sid = h.dataset.sid; minimized.has(sid) ? minimized.delete(sid) : minimized.add(sid);
+  store('cd.min', [...minimized]); renderSessions();
+});
+document.addEventListener('input', (e) => { if (e.target.matches('textarea')) { drafts[e.target.dataset.pid] = e.target.value; e.target.style.height = 'auto'; e.target.style.height = Math.min(160, e.target.scrollHeight) + 'px'; } });
+document.addEventListener('keydown', (e) => { if (e.target.matches('textarea') && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.target.form.requestSubmit(); } });
+document.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pid = e.target.dataset.pid, ta = e.target.querySelector('textarea'), btn = e.target.querySelector('button'), note = $('note-' + pid);
+  const text = ta.value.trim(); if (!text) return;
+  btn.disabled = true; note.className = 'note'; note.textContent = 'sending…';
+  try {
+    const r = await fetch('/api/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pid: Number(pid), text }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.status);
+    ta.value = ''; drafts[pid] = ''; ta.style.height = 'auto'; note.className = 'note ok'; note.textContent = 'sent ✓';
+  } catch (err) { note.className = 'note err'; note.textContent = 'failed: ' + err.message; }
+  btn.disabled = false; setTimeout(() => { if (note.textContent === 'sent ✓') note.textContent = ''; }, 4000);
+});
+
+refresh(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>
